@@ -9,40 +9,30 @@ let storageInstance: Storage | null = null;
 
 export const getStorageClient = (): Storage => {
   if (!storageInstance) {
-    const storageOptions: { projectId: string; keyFilename?: string } = {
+    const storageOptions: { projectId: string; keyFilename?: string; credentials?: any } = {
       projectId: config.projectId,
     };
     
-    // Buscar el archivo de credenciales en diferentes ubicaciones posibles
-    const fs = require('fs');
-    const path = require('path');
-    
-    // Rutas posibles donde puede estar el archivo
-    const possiblePaths = [
-      config.keyFile, // Ruta configurada (desarrollo: ./src/...)
-      path.join(process.cwd(), 'src/infraestructura/config/gcp-key.json'), // Desarrollo
-      path.join(process.cwd(), 'dist/infraestructura/config/gcp-key.json'), // Producción compilado
-      path.join(__dirname, '../config/gcp-key.json'), // Relativo al archivo compilado
-      path.join(__dirname, '../../config/gcp-key.json'), // Alternativa relativa
-      '/app/src/infraestructura/config/gcp-key.json', // Docker/Cloud Run
-    ];
-    
-    let keyFileFound = false;
-    for (const filePath of possiblePaths) {
+    // Prioridad 1: variable de entorno con credenciales (producción)
+    const credentialsJson = process.env.GOOGLE_CLOUD_CREDENTIALS_JSON;
+    if (credentialsJson) {
       try {
-        if (fs.existsSync(filePath)) {
-          storageOptions.keyFilename = filePath;
-          logger.info(`✅ Archivo de credenciales GCP encontrado en: ${filePath}`);
-          keyFileFound = true;
-          break;
+        storageOptions.credentials = JSON.parse(credentialsJson);
+        logger.info('✅ Credenciales GCP cargadas desde GOOGLE_CLOUD_CREDENTIALS_JSON');
+      } catch (error) {
+        logger.error('❌ Error al parsear GOOGLE_CLOUD_CREDENTIALS_JSON', { error });
+      }
+    } else {
+      // Prioridad 2: archivo local (desarrollo)
+      try {
+        const fs = require('fs');
+        if (fs.existsSync(config.keyFile)) {
+          storageOptions.keyFilename = config.keyFile;
+          logger.info('✅ Credenciales GCP cargadas desde archivo local');
         }
       } catch (error) {
-        // Continuar buscando en otras rutas
+        logger.warn('⚠️ No se encontraron credenciales GCP; usando ADC');
       }
-    }
-    
-    if (!keyFileFound) {
-      logger.warn('⚠️ No se encontró archivo de credenciales GCP, intentando Application Default Credentials');
     }
     
     storageInstance = new Storage(storageOptions);

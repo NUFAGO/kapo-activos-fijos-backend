@@ -103,6 +103,7 @@ jspm_packages/
 !tsconfig.json
 !jest.config.js
 !.eslintrc.js
+GOOGLE_CLOUD_CREDENTIALS.txt
 
 # Temporary files
 tmp/
